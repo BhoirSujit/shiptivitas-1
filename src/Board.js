@@ -50,41 +50,61 @@ export default class Board extends React.Component {
       status: companyDetails[3],
     }));
   }
-
   componentDidMount() {
-    const drake = Dragula([...Object.values(this.swimlanes).map(ref => ref.current)], {
-      accepts: (el, target, source, sibling) => true,
-
-    });
-  
-    drake.on('drop', (el, target, source, sibling) => {
-      drake.cancel(true); 
-      const cardId = el.getAttribute('data-id');
-      const newStatus = Object.keys(this.swimlanes).find(key => this.swimlanes[key].current === target);
+        this.drake = Dragula([
+          this.swimlanes.backlog.current,
+          this.swimlanes.inProgress.current,
+          this.swimlanes.complete.current,
+        ]);
+        this.drake.on('drop', (el, target, source, sibling) => this.updateClient(el, target, source, sibling));
+      }
+    
+      componentWillUnmount() {
+        this.drake.remove();
+      }
+    
       
-      const updatedClients = { ...this.state.clients };
-  
-      // Find the client 
-      let movedClient = null;
-      for (const status in updatedClients) {
-        const index = updatedClients[status].findIndex(client => client.id.toString() === cardId);
-        if (index > -1) {
-          movedClient = { ...updatedClients[status][index], status: newStatus };
-          updatedClients[status].splice(index, 1); 
-          break;
+      updateClient(el, target, _, sibling) {
+        
+        this.drake.cancel(true);
+    
+        
+        let targetSwimlane = 'backlog';
+        if (target === this.swimlanes.inProgress.current) {
+          targetSwimlane = 'in-progress';
+        } else if (target === this.swimlanes.complete.current) {
+          targetSwimlane = 'complete';
         }
+    
+        
+        const clientsList = [
+          ...this.state.clients.backlog,
+          ...this.state.clients.inProgress,
+          ...this.state.clients.complete,
+        ];
+        const clientThatMoved = clientsList.find(client => client.id === el.dataset.id);
+        const clientThatMovedClone = {
+          ...clientThatMoved,
+          status: targetSwimlane,
+        };
+    
+        
+        const updatedClients = clientsList.filter(client => client.id !== clientThatMovedClone.id);
+    
+        
+        const index = updatedClients.findIndex(client => sibling && client.id === sibling.dataset.id);
+        updatedClients.splice(index === -1 ? updatedClients.length : index , 0, clientThatMovedClone);
+    
+       
+        this.setState({
+          clients: {
+            backlog: updatedClients.filter(client => !client.status || client.status === 'backlog'),
+            inProgress: updatedClients.filter(client => client.status && client.status === 'in-progress'),
+            complete: updatedClients.filter(client => client.status && client.status === 'complete'),
+          }
+        });
       }
   
-      // Add the client
-      if (movedClient && newStatus) {
-        updatedClients[newStatus] = updatedClients[newStatus] || [];
-        updatedClients[newStatus].push(movedClient);
-      }
-  
-      // Update the state
-      this.setState({ clients: updatedClients });
-    });
-  }
 
   renderSwimlane(name, clients, ref) {
     return (
