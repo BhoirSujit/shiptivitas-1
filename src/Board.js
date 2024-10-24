@@ -11,7 +11,7 @@ export default class Board extends React.Component {
     this.state = {
       clients: {
         backlog: clients.filter(client => !client.status || client.status === 'backlog'),
-        inProgress: clients.filter(client => client.status && client.status === 'in-progress'),
+        inProgress: clients.filter(client => client.status && client.status === 'in-progress' ),
         complete: clients.filter(client => client.status && client.status === 'complete'),
       }
     }
@@ -50,6 +50,42 @@ export default class Board extends React.Component {
       status: companyDetails[3],
     }));
   }
+
+  componentDidMount() {
+    const drake = Dragula([...Object.values(this.swimlanes).map(ref => ref.current)], {
+      accepts: (el, target, source, sibling) => true,
+
+    });
+  
+    drake.on('drop', (el, target, source, sibling) => {
+      drake.cancel(true); 
+      const cardId = el.getAttribute('data-id');
+      const newStatus = Object.keys(this.swimlanes).find(key => this.swimlanes[key].current === target);
+      
+      const updatedClients = { ...this.state.clients };
+  
+      // Find the client 
+      let movedClient = null;
+      for (const status in updatedClients) {
+        const index = updatedClients[status].findIndex(client => client.id.toString() === cardId);
+        if (index > -1) {
+          movedClient = { ...updatedClients[status][index], status: newStatus };
+          updatedClients[status].splice(index, 1); 
+          break;
+        }
+      }
+  
+      // Add the client
+      if (movedClient && newStatus) {
+        updatedClients[newStatus] = updatedClients[newStatus] || [];
+        updatedClients[newStatus].push(movedClient);
+      }
+  
+      // Update the state
+      this.setState({ clients: updatedClients });
+    });
+  }
+
   renderSwimlane(name, clients, ref) {
     return (
       <Swimlane name={name} clients={clients} dragulaRef={ref}/>
